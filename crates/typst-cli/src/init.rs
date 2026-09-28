@@ -5,6 +5,7 @@ use codespan_reporting::term::termcolor::{Color, ColorSpec, WriteColor};
 use ecow::eco_format;
 use fs_extra::dir::CopyOptions;
 use typst::diag::{FileError, StrResult, bail};
+use typst::syntax::VirtualPath;
 use typst::syntax::package::{
     PackageManifest, PackageSpec, TemplateInfo, VersionlessPackageSpec,
 };
@@ -77,7 +78,15 @@ fn scaffold_project(
         bail!("project directory already exists (at {})", project_dir.display());
     }
 
-    let template_dir = package_path.join(template.path.as_str());
+    let path_str = template.path.as_str();
+    if Path::new(path_str).is_absolute() {
+        bail!("template path is invalid (must be relative to the package)");
+    }
+    VirtualPath::new(path_str).map_err(|err| {
+        eco_format!("template path is invalid ({err})")
+    })?;
+
+    let template_dir = package_path.join(path_str);
     if !template_dir.exists() {
         bail!("template directory does not exist (at {})", template_dir.display());
     }

@@ -255,6 +255,85 @@ fn test_target_available() {
     exec().arg("compile").arg(&main).must_succeed();
 }
 
+#[test]
+fn test_init_rejects_traversal_path() {
+    let package = tempfs();
+    let project = tempfs();
+    package.write(
+        "local/evil/0.1.0/typst.toml",
+        r#"[package]
+           name = "evil"
+           version = "0.1.0"
+           entrypoint = "main.typ"
+
+           [template]
+           path = "../../.."
+           entrypoint = "main.typ""#,
+    );
+    package.write("local/evil/0.1.0/main.typ", "");
+    let output = exec()
+        .arg("init")
+        .arg("@local/evil:0.1.0")
+        .arg(project.resolve("out"))
+        .arg("--package-path")
+        .arg(package.path())
+        .must_fail();
+    output.stderr.must_contain("template path is invalid");
+}
+
+#[test]
+fn test_init_rejects_absolute_path() {
+    let package = tempfs();
+    let project = tempfs();
+    package.write(
+        "local/evil/0.1.0/typst.toml",
+        r#"[package]
+           name = "evil"
+           version = "0.1.0"
+           entrypoint = "main.typ"
+
+           [template]
+           path = "/tmp"
+           entrypoint = "main.typ""#,
+    );
+    package.write("local/evil/0.1.0/main.typ", "");
+    let output = exec()
+        .arg("init")
+        .arg("@local/evil:0.1.0")
+        .arg(project.resolve("out"))
+        .arg("--package-path")
+        .arg(package.path())
+        .must_fail();
+    output.stderr.must_contain("template path is invalid");
+}
+
+#[test]
+fn test_init_accepts_valid_path() {
+    let package = tempfs();
+    let project = tempfs();
+    package.write(
+        "local/demo/0.1.0/typst.toml",
+        r#"[package]
+           name = "demo"
+           version = "0.1.0"
+           entrypoint = "main.typ"
+
+           [template]
+           path = "template"
+           entrypoint = "main.typ""#,
+    );
+    package.write("local/demo/0.1.0/main.typ", "");
+    package.write("local/demo/0.1.0/template/main.typ", "= Hello");
+    exec()
+        .arg("init")
+        .arg("@local/demo:0.1.0")
+        .arg(project.resolve("out"))
+        .arg("--package-path")
+        .arg(package.path())
+        .must_succeed();
+    project.read("out/main.typ").must_contain("Hello");
+}
+
 /// Executes a command with the Typst CLI.
 fn exec() -> Command {
     Command::new(env!("CARGO_BIN_EXE_typst"))
